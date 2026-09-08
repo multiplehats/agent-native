@@ -27,10 +27,13 @@ import { defineAgentNativeConfig } from "@agent-native/core/config";
 
 export default defineAgentNativeConfig({
   runtime: {
-    frameworkRoutePrefix: "/_platform",
+    frameworkRoutePrefix: "/_agent-native",
   },
 });
 ```
+
+The example explicitly sets the existing default; omitting the field has the same
+behavior. A deployment can opt into a different value, such as `/_platform`.
 
 The proposed field belongs to the public `AgentNativeConfig` surface. Its deployment
 alias would follow the existing descriptor convention:
