@@ -50,7 +50,7 @@ compose with the prefix: an app mounted at `/mail` with `/_platform` would expos
 Initial validation should accept one absolute path segment made from ASCII letters,
 digits, `_`, and `-`, with at least one letter or digit. Reject an empty value, `/`,
 trailing slashes, queries, fragments, escapes, dot segments, and reserved namespaces
-such as `/api` and `/.well-known`. A strict initial shape keeps URL matching and
+such as `/api`, `/mcp`, and `/.well-known`. A strict initial shape keeps URL matching and
 security checks unambiguous; nested namespaces can be considered separately.
 Existing app routes and workspace mounts must be checked for collisions at startup
 or build time, with a diagnostic identifying both owners.
@@ -112,7 +112,9 @@ If aliases are supported, they should be explicit and bounded to framework route
 both paths must receive identical authentication and CSRF enforcement. Aliases must
 not silently shadow application routes, and incoming POST bodies must never be
 redirected across namespaces. A deploy without aliases needs a documented cutover
-and rollback procedure, including links already sent to users.
+and rollback procedure, including links already sent to users. When aliases are
+disabled, the canonical internal namespace must not remain externally routable;
+internal self-dispatch must use the public builder or a separate internal transport.
 
 ## Implementation and acceptance criteria
 
@@ -121,16 +123,21 @@ request boundaries and all outgoing surfaces in the same feature. Do not adverti
 the setting as supported while authentication or a deployment adapter still requires
 a dependency patch. Keep default behavior covered throughout the migration.
 
-| Area            | Required checks                                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Configuration   | Default; file/environment precedence; invalid types and paths; unknown keys; collisions.                                              |
-| Path handling   | Root and nested requests; queries; similar prefixes; base-path composition; idempotence; external URLs unchanged.                     |
-| Clients         | Actions, upload, SSE, chat, and toolkit calls use the selected public path.                                                           |
-| Authentication  | Session and sign-in flows, reset/magic links, generated documents, callback construction and validation use the selected path.        |
-| Security        | Protected requests stay protected; unsafe cross-origin requests fail; malformed and encoded paths cannot bypass classification.       |
-| Server dispatch | Health probes, scheduled jobs, continuation, and background task handoff reach the configured public routes.                          |
-| Deployment      | Dev plus each supported adapter emits and serves the selected routes, including app-base-path mounts and reserved discovery paths.    |
-| Compatibility   | Default fixture behavior is unchanged; remote installations retain their own endpoints; any explicit aliases enforce the same policy. |
+| Area            | Required checks                                                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Configuration   | Default; file/environment precedence; invalid types and paths; unknown keys; collisions.                                                                   |
+| Path handling   | Root and nested requests; queries; similar prefixes; base-path composition; idempotence; external URLs unchanged.                                          |
+| Clients         | Actions, upload, SSE, chat, and toolkit calls use the selected public path.                                                                                |
+| Authentication  | Session and sign-in flows, reset/magic links, generated documents, callback construction and validation use the selected path.                             |
+| Security        | Protected requests stay protected; unsafe cross-origin requests fail; malformed and encoded paths cannot bypass classification.                            |
+| Server dispatch | Health probes, scheduled jobs, continuation, and background task handoff reach the configured public routes.                                               |
+| Deployment      | Dev and each supported adapter serve action and discovered file routes under the selected prefix, including base-path mounts and reserved discovery paths. |
+| Compatibility   | Default fixture behavior is unchanged; remote installations retain their own endpoints; any explicit aliases enforce the same policy.                      |
+
+Development checks must include extension-bearing endpoints such as `.json` and
+images, which need to reach framework handlers instead of static-file middleware.
+Configured framework routes must never fall through to the SSR/static shell, and
+existing framework `no-store` header rules must follow the configured namespace.
 
 At least one integration fixture should build and serve with a custom prefix and
 exercise an authenticated action and an event stream through the actual request
@@ -144,9 +151,16 @@ requiring live provider credentials.
 - [Client path construction](../packages/core/src/client/api-path.ts)
 - [Framework request handler and mount matching](../packages/core/src/server/framework-request-handler.ts)
 - [Core route registration](../packages/core/src/server/core-routes-plugin.ts)
+- [Authentication and public request URLs](../packages/core/src/server/auth.ts)
+- [Better Auth base path and email links](../packages/core/src/server/better-auth-instance.ts)
+- [Google OAuth URLs](../packages/core/src/server/google-oauth.ts)
+- [Standalone sign-in client](../packages/core/src/client/auth/AuthPage.tsx)
 - [CSRF route classification](../packages/core/src/server/csrf.ts)
 - [Vite dev gateway and config injection](../packages/core/src/vite/client.ts)
 - [Deployment entries and adapter output](../packages/core/src/deploy/build.ts)
+- [File route discovery](../packages/core/src/deploy/route-discovery.ts)
+- [Workspace deployment routing](../packages/core/src/deploy/workspace-deploy.ts)
+- [Netlify framework cache headers](../packages/core/src/deploy/netlify-static-headers.ts)
 
 ## Decisions requested from maintainers
 
